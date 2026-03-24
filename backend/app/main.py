@@ -7,7 +7,7 @@ from app.api.routes.reconcile import router as reconcile_router
 
 app = FastAPI(
     title="Clinical Reconciliation Engine",
-    description="Mini clinical data reconciliation engine for internship take-home assessment.",
+    description="Clinical data reconciliation and quality review platform.",
     version="0.1.0",
 )
 

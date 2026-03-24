@@ -1,7 +1,10 @@
 fastapi
 httpx
+joblib
+numpy
 openai
 pydantic
 pytest
 python-dotenv
+scikit-learn
 uvicorn

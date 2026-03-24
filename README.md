@@ -1,6 +1,6 @@
 # Clinical Reconciliation Engine
 
-A take-home assessment project for the Full Stack Developer - EHR Integration Intern role. The app reconciles conflicting medication data, validates patient record quality, and presents the results in a clinician-friendly dashboard.
+A clinician-facing data reconciliation platform that resolves conflicting medication data, validates patient record quality, and presents review-ready recommendations in a clear dashboard.
 
 Repository contents include:
 
@@ -14,6 +14,7 @@ Repository contents include:
 - Backend: FastAPI + Pydantic
 - Frontend: React + Vite + Tailwind CSS
 - AI: OpenAI API (`gpt-4.1-mini` by default) with deterministic fallback and in-memory response caching
+- ML: lightweight `scikit-learn` logistic regression confidence calibration layer
 - Auth: simple API key header (`x-api-key`)
 - Storage: in-memory only for this version
 
@@ -81,6 +82,34 @@ This starts:
 - frontend on `http://localhost:5173`
 - backend on `http://localhost:8000`
 
+## Deployment
+
+The application is structured so the frontend and backend can be deployed as separate Vercel
+projects:
+
+- Frontend project root: `frontend/`
+- Backend project root: `backend/`
+
+### Vercel Deployment Notes
+
+Frontend environment variables:
+
+```bash
+VITE_API_BASE_URL=https://your-backend-project.vercel.app
+VITE_API_KEY=your-api-key
+```
+
+Backend environment variables:
+
+```bash
+API_KEY=your-api-key
+OPENAI_API_KEY=your-openai-key
+OPENAI_MODEL=gpt-4.1-mini
+```
+
+The backend exports the FastAPI application from `backend/app/index.py`, which is a supported
+entrypoint pattern for Vercel FastAPI deployments.
+
 ## API Design
 
 ### `POST /api/reconcile/medication`
@@ -116,9 +145,10 @@ It also returns a structured issue list for the frontend to display.
 The backend uses a hybrid approach:
 
 - deterministic rules handle scoring and guardrails
+- a lightweight logistic regression model calibrates confidence using structured reconciliation features
 - the LLM is used for concise clinician-friendly explanation
 - if the API key is missing or the call fails, the backend falls back to deterministic reasoning
-- identical payloads are cached in memory to reduce repeat API usage during demos
+- identical payloads are cached in memory to reduce repeat API usage and improve response efficiency
 
 Prompt design goals:
 
@@ -128,7 +158,13 @@ Prompt design goals:
 
 ## Which LLM API I Used and Why
 
-I used the OpenAI API, with `gpt-4.1-mini` as the default model. I chose it because it is fast, affordable for a take-home demo, and strong enough for concise clinical-style reasoning and explanations. I kept the deterministic reconciliation and validation logic separate so the app remains reliable even if the model is unavailable.
+I used the OpenAI API, with `gpt-4.1-mini` as the default model. I chose it because it is fast, affordable to operate, and strong enough for concise clinical-style reasoning and explanations. I kept the deterministic reconciliation and validation logic separate so the app remains reliable even if the model is unavailable.
+
+## ML Extension for Future Scaling
+
+I added a lightweight logistic regression model as a confidence calibration layer for medication reconciliation. The deterministic rules still choose the winning medication record, but the ML model looks at structured features such as reliability, recency, disagreement level, and winner margin to estimate how strong that decision is.
+
+This confidence layer is intentionally lightweight and designed to evolve as more labeled reconciliation outcomes become available. In a production environment, the model would be retrained on real resolved cases rather than synthetic training examples.
 
 ## Key Design Decisions
 
@@ -138,7 +174,7 @@ I used the OpenAI API, with `gpt-4.1-mini` as the default model. I chose it beca
 - The app uses a hybrid AI pattern rather than pure LLM output so the system stays explainable and resilient when the model is unavailable.
 - A separate architecture note is included in `docs/architecture-decisions.md`.
 
-## Trade-offs
+## Key Design Decisions and Trade-offs
 
 - Medication normalization is intentionally lightweight and rule-based.
 - The clinical logic is not meant to replace real medication reconciliation workflows.
@@ -158,7 +194,7 @@ Current verification status:
 - backend tests: 6 passing
 - frontend production build: passing
 
-## What I Would Improve With More Time
+## Product Roadmap
 
 - stronger medication parsing and duplicate detection
 - persistent storage for reconciliation decisions
@@ -169,4 +205,6 @@ Current verification status:
 
 ## Estimated Time Spent
 
-Approximately 10-14 hours for scaffold, core backend logic, dashboard, tests, and containerization.
+Estimated implementation time: approximately 5 days across backend API design,
+frontend dashboard development, AI and ML integration, testing, containerization,
+and documentation.

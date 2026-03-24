@@ -46,6 +46,11 @@ function Dashboard() {
   const [error, setError] = useState('')
   const [loadingSection, setLoadingSection] = useState('')
 
+  const qualityIssues =
+    qualityResult?.issues_detected?.filter((issue) => issue.field !== 'summary') || []
+  const qualitySummary =
+    qualityResult?.issues_detected?.find((issue) => issue.field === 'summary')?.issue || ''
+
   async function handleReconcile() {
     setError('')
     setLoadingSection('reconcile')
@@ -81,7 +86,7 @@ function Dashboard() {
       <div className="mx-auto max-w-7xl">
         <section className="rounded-[36px] border border-white/70 bg-[linear-gradient(135deg,rgba(13,47,54,0.95),rgba(25,91,86,0.88))] px-6 py-10 text-white shadow-[0_35px_90px_-45px_rgba(10,35,42,0.75)] sm:px-10">
           <p className="m-0 text-sm font-semibold uppercase tracking-[0.28em] text-emerald-200">
-            Onye Technical Assessment
+            Clinical Review Workspace
           </p>
           <h1 className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight sm:text-5xl">
             Clinical Data Reconciliation Engine
@@ -172,15 +177,22 @@ function Dashboard() {
               />
             </div>
 
+            <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
+              <p className="m-0 text-sm font-medium text-slate-900">Quality summary</p>
+              <p className="mt-2 m-0 text-sm leading-6 text-slate-700">
+                {qualitySummary || 'Run validation to generate a summary of the current quality risks.'}
+              </p>
+            </div>
+
             <div className="mt-5 rounded-2xl bg-slate-50 p-4">
               <p className="m-0 text-sm font-medium text-slate-900">Detected issues</p>
               <ul className="mt-3 space-y-3 pl-5 text-sm text-slate-700">
-                {(qualityResult?.issues_detected || []).map((issue) => (
+                {qualityIssues.map((issue) => (
                   <li key={`${issue.field}-${issue.issue}`}>
                     <span className="font-semibold text-slate-900">{issue.field}:</span> {issue.issue}
                   </li>
                 ))}
-                {!qualityResult?.issues_detected?.length ? (
+                {!qualityIssues.length ? (
                   <li>No issues yet. Run validation to score a record.</li>
                 ) : null}
               </ul>

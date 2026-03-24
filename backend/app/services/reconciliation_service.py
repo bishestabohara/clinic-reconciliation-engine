@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import date
 
+from app.ml.features import build_confidence_features
+from app.ml.model import predict_confidence
 from app.schemas.reconcile import (
     MedicationReconcileRequest,
     MedicationReconcileResponse,
@@ -32,7 +34,7 @@ def reconcile_medications(payload: MedicationReconcileRequest) -> MedicationReco
     ranked_sources = sorted(payload.sources, key=_source_date, reverse=True)
     newest_date = _source_date(ranked_sources[0])
 
-    scored_sources: list[tuple[float, MedicationSource]] = []
+    scored_sources: list[dict[str, float | MedicationSource]] = []
     for source in ranked_sources:
         recency_delta = (newest_date - _source_date(source)).days if newest_date != date.min else 0
         recency_score = max(0.1, 1 - (recency_delta / 365))
@@ -42,14 +44,50 @@ def reconcile_medications(payload: MedicationReconcileRequest) -> MedicationReco
             conditions=payload.patient_context.conditions,
         )
         total_score = (0.55 * reliability_score) + (0.3 * recency_score) + context_bonus
-        scored_sources.append((round(total_score, 4), source))
+        scored_sources.append(
+            {
+                "score": round(total_score, 4),
+                "source": source,
+                "recency_score": round(recency_score, 4),
+                "reliability_score": reliability_score,
+                "context_bonus": context_bonus,
+            }
+        )
 
-    best_score, best_source = max(scored_sources, key=lambda item: item[0])
+    scored_sources.sort(key=lambda item: item["score"], reverse=True)
+    best_entry = scored_sources[0]
+    best_score = float(best_entry["score"])
+    best_source = best_entry["source"]
+    second_best_score = float(scored_sources[1]["score"]) if len(scored_sources) > 1 else 0.0
+    winner_margin = max(0.0, round(best_score - second_best_score, 4))
     disagreement_penalty = 0.08 * max(0, len({source.medication for source in payload.sources}) - 1)
-    confidence_score = max(0.35, min(0.99, round(best_score - disagreement_penalty, 2)))
+    heuristic_confidence = max(0.35, min(0.99, round(best_score - disagreement_penalty, 2)))
+
+    has_pharmacy_evidence = int(any(source.system.lower() == "pharmacy" for source in payload.sources))
+    has_portal_contradiction = int(
+        any("not currently taking" in source.medication.lower() for source in payload.sources)
+    )
+    ml_features = build_confidence_features(
+        reliability_score=float(best_entry["reliability_score"]),
+        recency_score=float(best_entry["recency_score"]),
+        context_bonus=float(best_entry["context_bonus"]),
+        winner_margin=winner_margin,
+        unique_med_count=len({source.medication for source in payload.sources}),
+        total_sources=len(payload.sources),
+        has_pharmacy_evidence=has_pharmacy_evidence,
+        has_portal_contradiction=has_portal_contradiction,
+    )
+    ml_confidence = predict_confidence(ml_features)
+    confidence_score = heuristic_confidence
+    if ml_confidence is not None:
+        confidence_score = max(
+            0.35,
+            min(0.99, round((0.75 * heuristic_confidence) + (0.25 * ml_confidence), 2)),
+        )
+
     safety_check = "PASSED" if confidence_score >= 0.8 else "REVIEW"
 
-    if any("not currently taking" in source.medication.lower() for source in payload.sources):
+    if has_portal_contradiction:
         safety_check = "REVIEW"
 
     fallback_reasoning = (

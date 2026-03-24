@@ -28,6 +28,11 @@ function QualityForm({ value, onChange, onSubmit, isLoading }) {
         </button>
       </div>
 
+      <p className="mt-4 m-0 text-sm leading-6 text-slate-600">
+        Paste or edit a patient record payload in JSON format to score data quality and flag
+        incomplete or implausible fields.
+      </p>
+
       <textarea
         className="mt-5 min-h-80 w-full rounded-2xl border border-slate-200 bg-slate-950 p-4 font-mono text-sm leading-6 text-slate-100 outline-none ring-0"
         value={value}
