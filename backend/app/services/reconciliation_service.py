@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+import re
 
 from app.ml.features import build_confidence_features
 from app.ml.model import predict_confidence
@@ -19,6 +20,36 @@ def _source_date(source: MedicationSource) -> date:
     return source.last_updated or source.last_filled or date.min
 
 
+def _normalize_medication_name(medication: str) -> str:
+    normalized = medication.lower()
+    normalized = re.sub(r"\b\d+(\.\d+)?\s*(mg|mcg|g|ml)\b", "", normalized)
+    normalized = re.sub(r"\b(daily|twice daily|once daily|bid|tid|qid)\b", "", normalized)
+    normalized = re.sub(r"[^a-z\s]", " ", normalized)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    return normalized
+
+
+def _detect_duplicate_candidates(sources: list[MedicationSource]) -> list[dict[str, list[str] | str]]:
+    grouped_sources: dict[str, list[MedicationSource]] = {}
+    for source in sources:
+        normalized_name = _normalize_medication_name(source.medication)
+        grouped_sources.setdefault(normalized_name, []).append(source)
+
+    duplicate_candidates: list[dict[str, list[str] | str]] = []
+    for normalized_name, group in grouped_sources.items():
+        distinct_medications = sorted({source.medication for source in group})
+        if normalized_name and len(group) > 1 and len(distinct_medications) > 1:
+            duplicate_candidates.append(
+                {
+                    "normalized_medication": normalized_name,
+                    "source_systems": [source.system for source in group],
+                    "raw_entries": distinct_medications,
+                }
+            )
+
+    return duplicate_candidates
+
+
 def _condition_context_bonus(medication: str, conditions: list[str]) -> float:
     normalized_medication = medication.lower()
     condition_blob = " ".join(conditions).lower()
@@ -33,6 +64,7 @@ def _condition_context_bonus(medication: str, conditions: list[str]) -> float:
 def reconcile_medications(payload: MedicationReconcileRequest) -> MedicationReconcileResponse:
     ranked_sources = sorted(payload.sources, key=_source_date, reverse=True)
     newest_date = _source_date(ranked_sources[0])
+    duplicate_candidates = _detect_duplicate_candidates(payload.sources)
 
     scored_sources: list[dict[str, float | MedicationSource]] = []
     for source in ranked_sources:
@@ -106,4 +138,5 @@ def reconcile_medications(payload: MedicationReconcileRequest) -> MedicationReco
             "Document clinician approval or rejection in the reconciliation dashboard.",
         ],
         clinical_safety_check=safety_check,
+        duplicate_candidates=duplicate_candidates,
     )

@@ -24,6 +24,7 @@ Repository contents include:
 - `POST /api/validate/data-quality`
 - clinician dashboard for both workflows
 - confidence scoring and safety indicator
+- duplicate candidate detection for medication records with matching normalized names
 - approve/reject UI for AI suggestions
 - unit tests for reconciliation, quality checks, and auth
 - Docker support with `docker-compose`
@@ -120,6 +121,7 @@ Accepts patient context and a list of conflicting medication records. The servic
 - recency
 - rough condition-medication fit
 - disagreement across sources
+- duplicate candidate detection using normalized medication-name grouping
 
 Then it returns:
 
@@ -128,6 +130,7 @@ Then it returns:
 - reasoning
 - recommended actions
 - clinical safety check
+- duplicate candidate groups when likely duplicate medication records are detected
 
 ### `POST /api/validate/data-quality`
 
@@ -196,7 +199,7 @@ Current verification status:
 
 ## Product Roadmap
 
-- stronger medication parsing and duplicate detection
+- stronger medication parsing
 - persistent storage for reconciliation decisions
 - more detailed confidence calibration
 - richer LLM prompts with structured JSON output

@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Dict, Literal, Optional, Union
+from typing import Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -32,3 +32,4 @@ class MedicationReconcileResponse(BaseModel):
     reasoning: str
     recommended_actions: list[str]
     clinical_safety_check: str
+    duplicate_candidates: List[Dict[str, Union[List[str], str]]] = Field(default_factory=list)
